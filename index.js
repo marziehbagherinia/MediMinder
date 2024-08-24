@@ -74,63 +74,38 @@ app.post('/transcribe', upload.single('file'), async (req, res) => {
             }
         });
 
-        const outputFilePath = path.join(__dirname, 'speech2.mp3');
-
-        axios({
-            method: 'post',
-            url: 'https://api.openai.com/v1/audio/speech',
-            headers: {
-                'Authorization': `Bearer ${OPENAI_API_KEY}`,
-                'Content-Type': 'application/json',
-            },
-            data: {
+        const textToSpeech = await axios.post(
+            'https://api.openai.com/v1/audio/speech',
+            {
                 model: "tts-1",
                 input: textToText.data.choices[0].message.content,
                 voice: "alloy"
             },
-            responseType: 'stream'
-        })
-            .then(response => {
-                // Pipe the response to a file
-                response.data.pipe(fs.createWriteStream(outputFilePath));
+            {
+                headers: {
+                    'Authorization': `Bearer ${OPENAI_API_KEY}`,
+                    'Content-Type': 'application/json',
+                },
+                responseType: 'arraybuffer', // Important for binary data like audio
+            }
+        );
 
-                response.data.on('end', () => {
-                    console.log('Voice output saved to', outputFilePath);
-                    res.sendFile(outputFilePath, (err) => {
-                        if (err) {
-                            res.status(500).send('Error sending the file.');
-                        }
-                    });
-                });
+        const filePath = path.join(__dirname, 'output.mp3');
+        fs.writeFileSync(filePath, textToSpeech.data);
 
-            })
-            .catch(error => {
-                console.error('Error:', error.response ? error.response.data : error.message);
-            });
-
-        // const mp3 = await axios.post('https://api.openai.com/v1/audio/speech', {
-        //     model: "tts-1",
-        //     input: "The quick brown fox jumped over the lazy dog",
-        //     voice: "alloy"
-        // }, {
-        //     headers: {
-        //         'Authorization': `Bearer ${OPENAI_API_KEY}`,
-        //         'Content-Type': 'application/json',
-        //     }
-        // });
-
-        // res.send(`
-        //     <h2>Transcription Result</h2>
-        //     <p>${response.data.text}</p>
-        //     <p>${response2.data.choices[0].message.content}</p>
-        //     <a href="/">Transcribe another file</a>
-        // `);
+        res.download(filePath, (err) => {
+            if (err) {
+                console.error('Error sending file:', err);
+                res.status(500).send('Error downloading the file');
+            } else {
+                fs.unlinkSync(filePath);
+            }
+        });
     } catch (error) {
         // fs.unlinkSync(req.file.path);
-
-        console.error('Error transcribing audio:', error);
         res.status(500).send(error.response ? error.response.data : error.message);
     }
+
 });
 
 // Start the server
