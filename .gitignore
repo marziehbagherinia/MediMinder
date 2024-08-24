@@ -8,6 +8,10 @@ yarn-error.log*
 
 package-lock.json
 
+uploads/*
+uploads
+./uploads
+
 # Logs
 logs
 *.log
